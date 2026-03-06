@@ -30,6 +30,15 @@ type ModelCategory = {
   anthropicModels: AIModel[];
 };
 
+type DisplayOption = {
+  index: number;
+  id: number;
+  name: string;
+  resolution: string;
+  bounds: { x: number; y: number; width: number; height: number };
+  isPrimary: boolean;
+};
+
 // Define available models for each category
 const modelCategories: ModelCategory[] = [
   {
@@ -37,6 +46,16 @@ const modelCategories: ModelCategory[] = [
     title: 'Problem Extraction',
     description: 'Model used to analyze screenshots and extract problem details',
     openaiModels: [
+      {
+        id: "gpt-5.1",
+        name: "gpt-5.1",
+        description: "Best OpenAI model for coding-heavy extraction tasks"
+      },
+      {
+        id: "gpt-5.3-chat-latest",
+        name: "gpt-5.3-chat-latest",
+        description: "Latest GPT-5.3 chat snapshot used in ChatGPT"
+      },
       {
         id: "gpt-4o",
         name: "gpt-4o",
@@ -84,6 +103,16 @@ const modelCategories: ModelCategory[] = [
     description: 'Model used to generate coding solutions',
     openaiModels: [
       {
+        id: "gpt-5.1",
+        name: "gpt-5.1",
+        description: "Best OpenAI model for agentic coding solutions"
+      },
+      {
+        id: "gpt-5.3-chat-latest",
+        name: "gpt-5.3-chat-latest",
+        description: "Latest GPT-5.3 chat snapshot used in ChatGPT"
+      },
+      {
         id: "gpt-4o",
         name: "gpt-4o",
         description: "Strong overall performance for coding tasks"
@@ -129,6 +158,16 @@ const modelCategories: ModelCategory[] = [
     title: 'Debugging',
     description: 'Model used to debug and improve solutions',
     openaiModels: [
+      {
+        id: "gpt-5.1",
+        name: "gpt-5.1",
+        description: "Strongest OpenAI option for deep debugging workflows"
+      },
+      {
+        id: "gpt-5.3-chat-latest",
+        name: "gpt-5.3-chat-latest",
+        description: "Latest GPT-5.3 chat snapshot used in ChatGPT"
+      },
       {
         id: "gpt-4o",
         name: "gpt-4o",
@@ -184,6 +223,8 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
   const [extractionModel, setExtractionModel] = useState("gpt-4o");
   const [solutionModel, setSolutionModel] = useState("gpt-4o");
   const [debuggingModel, setDebuggingModel] = useState("gpt-4o");
+  const [displayIndex, setDisplayIndex] = useState<number | null>(null);
+  const [availableDisplays, setAvailableDisplays] = useState<DisplayOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { showToast } = useToast();
 
@@ -213,16 +254,23 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
         extractionModel?: string;
         solutionModel?: string;
         debuggingModel?: string;
+        displayIndex?: number | null;
       }
 
-      window.electronAPI
-        .getConfig()
-        .then((config: Config) => {
+      Promise.all([
+        window.electronAPI.getConfig(),
+        window.electronAPI.getAvailableDisplays()
+      ])
+        .then(([config, displays]: [Config, DisplayOption[]]) => {
           setApiKey(config.apiKey || "");
           setApiProvider(config.apiProvider || "openai");
           setExtractionModel(config.extractionModel || "gpt-4o");
           setSolutionModel(config.solutionModel || "gpt-4o");
           setDebuggingModel(config.debuggingModel || "gpt-4o");
+          setDisplayIndex(
+            config.displayIndex !== undefined ? config.displayIndex : null
+          );
+          setAvailableDisplays(displays || []);
         })
         .catch((error: unknown) => {
           console.error("Failed to load config:", error);
@@ -263,6 +311,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
         extractionModel,
         solutionModel,
         debuggingModel,
+        displayIndex,
       });
       
       if (result) {
@@ -316,9 +365,9 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
         }}
       >        
         <DialogHeader>
-          <DialogTitle>API Settings</DialogTitle>
+          <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="text-white/70">
-            Configure your API key and model preferences. You'll need your own API key to use this application.
+            Configure your API key, model preferences, and display options. You'll need your own API key to use this application.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -342,7 +391,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
                   />
                   <div className="flex flex-col">
                     <p className="font-medium text-white text-sm">OpenAI</p>
-                    <p className="text-xs text-white/60">GPT-4o models</p>
+                    <p className="text-xs text-white/60">GPT-5.3 and GPT-4o models</p>
                   </div>
                 </div>
               </div>
@@ -386,6 +435,63 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-white">Display Target</label>
+            <p className="text-xs text-white/60">
+              Choose which monitor to run on and capture from.
+            </p>
+            <div className="space-y-2">
+              <div
+                className={`p-2 rounded-lg cursor-pointer transition-colors ${
+                  displayIndex === null
+                    ? "bg-white/10 border border-white/20"
+                    : "bg-black/30 border border-white/5 hover:bg-white/5"
+                }`}
+                onClick={() => setDisplayIndex(null)}
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      displayIndex === null ? "bg-white" : "bg-white/20"
+                    }`}
+                  />
+                  <div>
+                    <p className="font-medium text-white text-xs">Automatic (Primary Display)</p>
+                    <p className="text-xs text-white/60">Use the system primary monitor</p>
+                  </div>
+                </div>
+              </div>
+
+              {availableDisplays.map((display) => (
+                <div
+                  key={display.id}
+                  className={`p-2 rounded-lg cursor-pointer transition-colors ${
+                    displayIndex === display.index
+                      ? "bg-white/10 border border-white/20"
+                      : "bg-black/30 border border-white/5 hover:bg-white/5"
+                  }`}
+                  onClick={() => setDisplayIndex(display.index)}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        displayIndex === display.index ? "bg-white" : "bg-white/20"
+                      }`}
+                    />
+                    <div>
+                      <p className="font-medium text-white text-xs">
+                        {display.name} {display.isPrimary ? "(Primary)" : ""}
+                      </p>
+                      <p className="text-xs text-white/60">
+                        {display.resolution} at ({display.bounds.x}, {display.bounds.y})
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           
@@ -463,6 +569,9 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
               <div className="grid grid-cols-2 gap-y-2 text-xs">
                 <div className="text-white/70">Toggle Visibility</div>
                 <div className="text-white/90 font-mono">Ctrl+B / Cmd+B</div>
+
+                <div className="text-white/70">Toggle Click-through</div>
+                <div className="text-white/90 font-mono">Ctrl+M / Cmd+M</div>
                 
                 <div className="text-white/70">Take Screenshot</div>
                 <div className="text-white/90 font-mono">Ctrl+H / Cmd+H</div>
@@ -481,6 +590,9 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
                 
                 <div className="text-white/70">Move Window</div>
                 <div className="text-white/90 font-mono">Ctrl+Arrow Keys</div>
+                
+                <div className="text-white/70">Scroll Answer</div>
+                <div className="text-white/90 font-mono">Ctrl+Shift+↑/↓</div>
                 
                 <div className="text-white/70">Decrease Opacity</div>
                 <div className="text-white/90 font-mono">Ctrl+[ / Cmd+[</div>

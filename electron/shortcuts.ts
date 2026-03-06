@@ -1,12 +1,32 @@
 import { globalShortcut, app } from "electron"
 import { IShortcutsHelperDeps } from "./main"
 import { configHelper } from "./ConfigHelper"
+import { logFocusProbe } from "./focusProbe"
 
 export class ShortcutsHelper {
   private deps: IShortcutsHelperDeps
 
   constructor(deps: IShortcutsHelperDeps) {
     this.deps = deps
+  }
+
+  private registerShortcut(
+    accelerator: string,
+    action: string,
+    handler: () => void | Promise<void>
+  ): void {
+    const registered = globalShortcut.register(accelerator, async () => {
+      logFocusProbe("shortcut", "shortcut-triggered", { accelerator, action })
+      await handler()
+    })
+
+    if (!registered) {
+      logFocusProbe("shortcut", "shortcut-register-failed", {
+        accelerator,
+        action
+      })
+      console.warn(`Failed to register global shortcut: ${accelerator} (${action})`)
+    }
   }
 
   private adjustOpacity(delta: number): void {
@@ -35,7 +55,7 @@ export class ShortcutsHelper {
   }
 
   public registerGlobalShortcuts(): void {
-    globalShortcut.register("CommandOrControl+H", async () => {
+    this.registerShortcut("CommandOrControl+H", "take-screenshot", async () => {
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow) {
         console.log("Taking screenshot...")
@@ -52,11 +72,11 @@ export class ShortcutsHelper {
       }
     })
 
-    globalShortcut.register("CommandOrControl+Enter", async () => {
+    this.registerShortcut("CommandOrControl+Enter", "process-screenshots", async () => {
       await this.deps.processingHelper?.processScreenshots()
     })
 
-    globalShortcut.register("CommandOrControl+R", () => {
+    this.registerShortcut("CommandOrControl+R", "reset-view", () => {
       console.log(
         "Command + R pressed. Canceling requests and resetting queues..."
       )
@@ -81,49 +101,74 @@ export class ShortcutsHelper {
     })
 
     // New shortcuts for moving the window
-    globalShortcut.register("CommandOrControl+Left", () => {
+    this.registerShortcut("CommandOrControl+Left", "move-window-left", () => {
       console.log("Command/Ctrl + Left pressed. Moving window left.")
       this.deps.moveWindowLeft()
     })
 
-    globalShortcut.register("CommandOrControl+Right", () => {
+    this.registerShortcut("CommandOrControl+Right", "move-window-right", () => {
       console.log("Command/Ctrl + Right pressed. Moving window right.")
       this.deps.moveWindowRight()
     })
 
-    globalShortcut.register("CommandOrControl+Down", () => {
+    this.registerShortcut("CommandOrControl+Down", "move-window-down", () => {
       console.log("Command/Ctrl + down pressed. Moving window down.")
       this.deps.moveWindowDown()
     })
 
-    globalShortcut.register("CommandOrControl+Up", () => {
+    this.registerShortcut("CommandOrControl+Up", "move-window-up", () => {
       console.log("Command/Ctrl + Up pressed. Moving window Up.")
       this.deps.moveWindowUp()
     })
 
-    globalShortcut.register("CommandOrControl+B", () => {
+    this.registerShortcut("CommandOrControl+Shift+Down", "scroll-answer-down", () => {
+      const mainWindow = this.deps.getMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("answer-scroll", {
+          direction: "down",
+          amount: 120
+        })
+      }
+    })
+
+    this.registerShortcut("CommandOrControl+Shift+Up", "scroll-answer-up", () => {
+      const mainWindow = this.deps.getMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("answer-scroll", {
+          direction: "up",
+          amount: 120
+        })
+      }
+    })
+
+    this.registerShortcut("CommandOrControl+B", "toggle-visibility", () => {
       console.log("Command/Ctrl + B pressed. Toggling window visibility.")
       this.deps.toggleMainWindow()
     })
 
-    globalShortcut.register("CommandOrControl+Q", () => {
+    this.registerShortcut("CommandOrControl+M", "toggle-click-through", () => {
+      console.log("Command/Ctrl + M pressed. Toggling click-through mode.")
+      this.deps.toggleClickThroughMode()
+    })
+
+    this.registerShortcut("CommandOrControl+Q", "quit-app", () => {
       console.log("Command/Ctrl + Q pressed. Quitting application.")
       app.quit()
     })
 
     // Adjust opacity shortcuts
-    globalShortcut.register("CommandOrControl+[", () => {
+    this.registerShortcut("CommandOrControl+[", "decrease-opacity", () => {
       console.log("Command/Ctrl + [ pressed. Decreasing opacity.")
       this.adjustOpacity(-0.1)
     })
 
-    globalShortcut.register("CommandOrControl+]", () => {
+    this.registerShortcut("CommandOrControl+]", "increase-opacity", () => {
       console.log("Command/Ctrl + ] pressed. Increasing opacity.")
       this.adjustOpacity(0.1)
     })
     
     // Zoom controls
-    globalShortcut.register("CommandOrControl+-", () => {
+    this.registerShortcut("CommandOrControl+-", "zoom-out", () => {
       console.log("Command/Ctrl + - pressed. Zooming out.")
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow) {
@@ -132,7 +177,7 @@ export class ShortcutsHelper {
       }
     })
     
-    globalShortcut.register("CommandOrControl+0", () => {
+    this.registerShortcut("CommandOrControl+0", "zoom-reset", () => {
       console.log("Command/Ctrl + 0 pressed. Resetting zoom.")
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow) {
@@ -140,7 +185,7 @@ export class ShortcutsHelper {
       }
     })
     
-    globalShortcut.register("CommandOrControl+=", () => {
+    this.registerShortcut("CommandOrControl+=", "zoom-in", () => {
       console.log("Command/Ctrl + = pressed. Zooming in.")
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow) {
@@ -150,7 +195,7 @@ export class ShortcutsHelper {
     })
     
     // Delete last screenshot shortcut
-    globalShortcut.register("CommandOrControl+L", () => {
+    this.registerShortcut("CommandOrControl+L", "delete-last-screenshot", () => {
       console.log("Command/Ctrl + L pressed. Deleting last screenshot.")
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow) {

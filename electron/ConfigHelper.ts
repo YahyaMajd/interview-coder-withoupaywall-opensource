@@ -13,6 +13,7 @@ interface Config {
   debuggingModel: string;
   language: string;
   opacity: number;
+  displayIndex: number | null;
 }
 
 export class ConfigHelper extends EventEmitter {
@@ -24,7 +25,8 @@ export class ConfigHelper extends EventEmitter {
     solutionModel: "gemini-2.0-flash",
     debuggingModel: "gemini-2.0-flash",
     language: "python",
-    opacity: 1.0
+    opacity: 1.0,
+    displayIndex: null
   };
 
   constructor() {
@@ -60,8 +62,8 @@ export class ConfigHelper extends EventEmitter {
    */
   private sanitizeModelSelection(model: string, provider: "openai" | "gemini" | "anthropic"): string {
     if (provider === "openai") {
-      // Only allow gpt-4o and gpt-4o-mini for OpenAI
-      const allowedModels = ['gpt-4o', 'gpt-4o-mini'];
+      // Only allow supported OpenAI model IDs used by this app.
+      const allowedModels = ['gpt-5.1', 'gpt-5.3-chat-latest', 'gpt-4o', 'gpt-4o-mini'];
       if (!allowedModels.includes(model)) {
         console.warn(`Invalid OpenAI model specified: ${model}. Using default model: gpt-4o`);
         return 'gpt-4o';
@@ -97,6 +99,14 @@ export class ConfigHelper extends EventEmitter {
         // Ensure apiProvider is a valid value
         if (config.apiProvider !== "openai" && config.apiProvider !== "gemini"  && config.apiProvider !== "anthropic") {
           config.apiProvider = "gemini"; // Default to Gemini if invalid
+        }
+
+        // Ensure displayIndex is either a non-negative integer or null
+        if (config.displayIndex !== null && config.displayIndex !== undefined) {
+          if (!Number.isInteger(config.displayIndex) || config.displayIndex < 0) {
+            console.warn(`Invalid displayIndex specified: ${config.displayIndex}. Falling back to automatic display selection.`);
+            config.displayIndex = null;
+          }
         }
         
         // Sanitize model selections to ensure only allowed models are used
@@ -149,6 +159,13 @@ export class ConfigHelper extends EventEmitter {
     try {
       const currentConfig = this.loadConfig();
       let provider = updates.apiProvider || currentConfig.apiProvider;
+
+      if (updates.displayIndex !== undefined) {
+        if (updates.displayIndex !== null && (!Number.isInteger(updates.displayIndex) || updates.displayIndex < 0)) {
+          console.warn(`Invalid displayIndex update specified: ${updates.displayIndex}. Falling back to automatic display selection.`);
+          updates.displayIndex = null;
+        }
+      }
       
       // Auto-detect provider based on API key format if a new key is provided
       if (updates.apiKey && !updates.apiProvider) {
@@ -203,7 +220,8 @@ export class ConfigHelper extends EventEmitter {
       // This prevents re-initializing the AI client when only opacity changes
       if (updates.apiKey !== undefined || updates.apiProvider !== undefined || 
           updates.extractionModel !== undefined || updates.solutionModel !== undefined || 
-          updates.debuggingModel !== undefined || updates.language !== undefined) {
+          updates.debuggingModel !== undefined || updates.language !== undefined ||
+          updates.displayIndex !== undefined) {
         this.emit('config-updated', newConfig);
       }
       

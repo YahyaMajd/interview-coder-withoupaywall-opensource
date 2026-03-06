@@ -12,11 +12,12 @@ interface HeaderProps {
 // Available programming languages
 const LANGUAGES = [
   { value: 'python', label: 'Python' },
+  { value: 'python3', label: 'Python 3' },
   { value: 'javascript', label: 'JavaScript' },
   { value: 'java', label: 'Java' },
   { value: 'cpp', label: 'C++' },
   { value: 'csharp', label: 'C#' },
-  { value: 'go', label: 'Go' },
+  { value: 'golang', label: 'Go' },
   { value: 'rust', label: 'Rust' },
   { value: 'typescript', label: 'TypeScript' },
 ];

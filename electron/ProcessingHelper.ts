@@ -129,6 +129,32 @@ export class ProcessingHelper {
     }
   }
 
+  private shouldUseMaxCompletionTokens(model: string): boolean {
+    const normalizedModel = (model || "").toLowerCase().trim()
+    return (
+      normalizedModel === "gpt-5.1" ||
+      normalizedModel === "gpt-5.3-chat-latest"
+    )
+  }
+
+  private getOpenAITokenLimitParams(
+    model: string,
+    tokenLimit: number
+  ): Record<string, number> {
+    if (this.shouldUseMaxCompletionTokens(model)) {
+      return { max_completion_tokens: tokenLimit }
+    }
+    return { max_tokens: tokenLimit }
+  }
+
+  private getOpenAITemperatureParams(model: string): Record<string, number> {
+    // Some GPT-5 family chat models only accept the default temperature.
+    if (this.shouldUseMaxCompletionTokens(model)) {
+      return {}
+    }
+    return { temperature: 0.2 }
+  }
+
   private async waitForInitialization(
     mainWindow: BrowserWindow
   ): Promise<void> {
@@ -495,11 +521,12 @@ export class ProcessingHelper {
         ];
 
         // Send to OpenAI Vision API
+        const extractionModel = config.extractionModel || "gpt-4o"
         const extractionResponse = await this.openaiClient.chat.completions.create({
-          model: config.extractionModel || "gpt-4o",
+          model: extractionModel,
           messages: messages,
-          max_tokens: 4000,
-          temperature: 0.2
+          ...this.getOpenAITokenLimitParams(extractionModel, 4000),
+          ...this.getOpenAITemperatureParams(extractionModel)
         });
 
         // Parse the response
@@ -774,14 +801,15 @@ Your solution should be efficient, well-commented, and handle edge cases.
         }
         
         // Send to OpenAI API
+        const solutionModel = config.solutionModel || "gpt-4o"
         const solutionResponse = await this.openaiClient.chat.completions.create({
-          model: config.solutionModel || "gpt-4o",
+          model: solutionModel,
           messages: [
             { role: "system", content: "You are an expert coding interview assistant. Provide clear, optimal solutions with detailed explanations." },
             { role: "user", content: promptText }
           ],
-          max_tokens: 4000,
-          temperature: 0.2
+          ...this.getOpenAITokenLimitParams(solutionModel, 4000),
+          ...this.getOpenAITemperatureParams(solutionModel)
         });
 
         responseContent = solutionResponse.choices[0].message.content;
@@ -1066,11 +1094,12 @@ If you include code examples, use proper markdown code blocks with language spec
           });
         }
 
+        const debuggingModel = config.debuggingModel || "gpt-4o"
         const debugResponse = await this.openaiClient.chat.completions.create({
-          model: config.debuggingModel || "gpt-4o",
+          model: debuggingModel,
           messages: messages,
-          max_tokens: 4000,
-          temperature: 0.2
+          ...this.getOpenAITokenLimitParams(debuggingModel, 4000),
+          ...this.getOpenAITemperatureParams(debuggingModel)
         });
         
         debugContent = debugResponse.choices[0].message.content;

@@ -1,0 +1,192 @@
+{
+  "meta": {
+    "startedAt": "2026-03-06T20:53:46.168Z",
+    "endedAt": "2026-03-06T20:54:54.856Z",
+    "sampleCount": 202,
+    "options": {
+      "intervalMs": 150,
+      "correlationMs": 2000,
+      "targetBundleId": "com.github.Electron",
+      "targetNameRegex": "^Electron$",
+      "targetUnixIds": [
+        55048
+      ],
+      "appLogPath": "/tmp/interview-coder-focus-events.jsonl"
+    },
+    "appEventSessions": [
+      {
+        "sessionId": "55048-1772830420807-0ynwxq",
+        "pid": 55048,
+        "ppid": 55047,
+        "count": 14,
+        "firstTs": "2026-03-06T20:54:07.553Z",
+        "lastTs": "2026-03-06T20:54:52.959Z"
+      }
+    ]
+  },
+  "summary": [],
+  "transitions": [
+    {
+      "ts": "2026-03-06T20:53:46.168Z",
+      "type": "frontmost-changed",
+      "from": null,
+      "to": {
+        "name": "Code",
+        "bundleId": "com.microsoft.VSCode",
+        "unixId": 1369
+      }
+    }
+  ],
+  "appEvents": [
+    {
+      "ts": "2026-03-06T20:54:07.553Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "ipc",
+      "event": "trigger-screenshot",
+      "payload": {}
+    },
+    {
+      "ts": "2026-03-06T20:54:07.554Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "main",
+      "event": "window-hidden",
+      "payload": {}
+    },
+    {
+      "ts": "2026-03-06T20:54:08.999Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "main",
+      "event": "window-shown-inactive",
+      "payload": {
+        "clickThroughMode": false
+      }
+    },
+    {
+      "ts": "2026-03-06T20:54:27.404Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "main",
+      "event": "window-did-finish-load",
+      "payload": {}
+    },
+    {
+      "ts": "2026-03-06T20:54:27.457Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "shortcut",
+      "event": "shortcut-triggered",
+      "payload": {
+        "accelerator": "CommandOrControl+M",
+        "action": "toggle-click-through"
+      }
+    },
+    {
+      "ts": "2026-03-06T20:54:27.457Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "main",
+      "event": "click-through-mode-changed",
+      "payload": {
+        "enabled": true
+      }
+    },
+    {
+      "ts": "2026-03-06T20:54:28.303Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "shortcut",
+      "event": "shortcut-triggered",
+      "payload": {
+        "accelerator": "CommandOrControl+H",
+        "action": "take-screenshot"
+      }
+    },
+    {
+      "ts": "2026-03-06T20:54:28.303Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "main",
+      "event": "window-hidden",
+      "payload": {}
+    },
+    {
+      "ts": "2026-03-06T20:54:29.803Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "main",
+      "event": "window-shown-inactive",
+      "payload": {
+        "clickThroughMode": true
+      }
+    },
+    {
+      "ts": "2026-03-06T20:54:30.740Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "shortcut",
+      "event": "shortcut-triggered",
+      "payload": {
+        "accelerator": "CommandOrControl+R",
+        "action": "reset-view"
+      }
+    },
+    {
+      "ts": "2026-03-06T20:54:31.671Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "shortcut",
+      "event": "shortcut-triggered",
+      "payload": {
+        "accelerator": "CommandOrControl+Enter",
+        "action": "process-screenshots"
+      }
+    },
+    {
+      "ts": "2026-03-06T20:54:51.269Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "shortcut",
+      "event": "shortcut-triggered",
+      "payload": {
+        "accelerator": "CommandOrControl+R",
+        "action": "reset-view"
+      }
+    },
+    {
+      "ts": "2026-03-06T20:54:52.862Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "shortcut",
+      "event": "shortcut-triggered",
+      "payload": {
+        "accelerator": "CommandOrControl+Q",
+        "action": "quit-app"
+      }
+    },
+    {
+      "ts": "2026-03-06T20:54:52.959Z",
+      "sessionId": "55048-1772830420807-0ynwxq",
+      "pid": 55048,
+      "ppid": 55047,
+      "source": "main",
+      "event": "window-closed",
+      "payload": {}
+    }
+  ]
+}

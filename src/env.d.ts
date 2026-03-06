@@ -59,6 +59,11 @@ interface ElectronAPI {
   installUpdate: () => void
   onUpdateAvailable: (callback: (info: any) => void) => () => void
   onUpdateDownloaded: (callback: (info: any) => void) => () => void
+  getClickThroughMode: () => Promise<boolean>
+  onClickThroughModeChanged: (callback: (enabled: boolean) => void) => () => void
+  onAnswerScroll: (
+    callback: (payload: { direction: "up" | "down"; amount?: number }) => void
+  ) => () => void
 }
 
 interface Window {

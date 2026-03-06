@@ -2,7 +2,7 @@
 
 import path from "node:path";
 import fs from "node:fs";
-import { app } from "electron";
+import { app, systemPreferences } from "electron";
 import { v4 as uuidv4 } from "uuid";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -11,10 +11,17 @@ import os from "os";
 
 const execFileAsync = promisify(execFile);
 
+export interface AvailableCaptureDisplay {
+  index: number;
+  id: number;
+  name: string;
+}
+
 export class ScreenshotHelper {
   private screenshotQueue: string[] = [];
   private extraScreenshotQueue: string[] = [];
   private readonly MAX_SCREENSHOTS = 5;
+  private captureDisplayIndex: number | null = null;
 
   private readonly screenshotDir: string;
   private readonly extraScreenshotDir: string;
@@ -22,8 +29,12 @@ export class ScreenshotHelper {
 
   private view: "queue" | "solutions" | "debug" = "queue";
 
-  constructor(view: "queue" | "solutions" | "debug" = "queue") {
+  constructor(
+    view: "queue" | "solutions" | "debug" = "queue",
+    captureDisplayIndex: number | null = null
+  ) {
     this.view = view;
+    this.captureDisplayIndex = captureDisplayIndex;
 
     // Initialize directories
     this.screenshotDir = path.join(app.getPath("userData"), "screenshots");
@@ -41,6 +52,48 @@ export class ScreenshotHelper {
 
     // Clean existing screenshot directories when starting the app
     this.cleanScreenshotDirectories();
+  }
+
+  public setCaptureDisplayIndex(displayIndex: number | null): void {
+    if (displayIndex !== null && (!Number.isInteger(displayIndex) || displayIndex < 0)) {
+      console.warn(
+        `Invalid capture display index: ${displayIndex}. Falling back to automatic display selection.`
+      );
+      this.captureDisplayIndex = null;
+      return;
+    }
+    this.captureDisplayIndex = displayIndex;
+    console.log("Updated capture display index:", this.captureDisplayIndex);
+  }
+
+  public async getAvailableDisplays(): Promise<AvailableCaptureDisplay[]> {
+    try {
+      const displays = await screenshot.listDisplays();
+      return displays.map((display, index) => ({
+        index,
+        id: display.id,
+        name: display.name || `Display ${index + 1}`,
+      }));
+    } catch (error) {
+      console.error("Failed to list capture displays:", error);
+      return [];
+    }
+  }
+
+  private async resolveTargetScreenId(): Promise<number | null> {
+    if (this.captureDisplayIndex === null) {
+      return null;
+    }
+
+    const displays = await screenshot.listDisplays();
+    const targetDisplay = displays[this.captureDisplayIndex];
+    if (!targetDisplay) {
+      console.warn(
+        `Capture display index ${this.captureDisplayIndex} is out of range. Falling back to default display.`
+      );
+      return null;
+    }
+    return targetDisplay.id;
   }
 
   private ensureDirectoriesExist(): void {
@@ -157,15 +210,32 @@ export class ScreenshotHelper {
   private async captureScreenshot(): Promise<Buffer> {
     try {
       console.log("Starting screenshot capture...");
+      const targetScreenId = await this.resolveTargetScreenId();
+      console.log("Target screen id for capture:", targetScreenId);
+
+      if (process.platform === "darwin") {
+        const status = systemPreferences.getMediaAccessStatus("screen");
+        if (status !== "granted") {
+          throw new Error(
+            "Screen recording permission is not granted. On macOS, enable it in System Settings > Privacy & Security > Screen Recording for Interview Coder and restart the app."
+          );
+        }
+      }
 
       // For Windows, try multiple methods
       if (process.platform === "win32") {
-        return await this.captureWindowsScreenshot();
+        return await this.captureWindowsScreenshot(targetScreenId);
       }
 
       // For macOS and Linux, use buffer directly
       console.log("Taking screenshot on non-Windows platform");
-      const buffer = await screenshot({ format: "png" });
+      const captureOptions: { format: "png"; screen?: number } = {
+        format: "png",
+      };
+      if (targetScreenId !== null) {
+        captureOptions.screen = targetScreenId;
+      }
+      const buffer = await screenshot(captureOptions);
       console.log(
         `Screenshot captured successfully, size: ${buffer.length} bytes`
       );
@@ -179,7 +249,7 @@ export class ScreenshotHelper {
   /**
    * Windows-specific screenshot capture with multiple fallback mechanisms
    */
-  private async captureWindowsScreenshot(): Promise<Buffer> {
+  private async captureWindowsScreenshot(targetScreenId: number | null): Promise<Buffer> {
     console.log("Attempting Windows screenshot with multiple methods");
 
     // Method 1: Try screenshot-desktop with filename first
@@ -189,7 +259,13 @@ export class ScreenshotHelper {
         `Taking Windows screenshot to temp file (Method 1): ${tempFile}`
       );
 
-      await screenshot({ filename: tempFile });
+      const captureOptions: { filename: string; screen?: number } = {
+        filename: tempFile,
+      };
+      if (targetScreenId !== null) {
+        captureOptions.screen = targetScreenId;
+      }
+      await screenshot(captureOptions);
 
       if (fs.existsSync(tempFile)) {
         const buffer = await fs.promises.readFile(tempFile);
@@ -218,14 +294,19 @@ export class ScreenshotHelper {
         const tempFile = path.join(this.tempDir, `ps-temp-${uuidv4()}.png`);
 
         // PowerShell command to take screenshot using .NET classes
+        const targetScreenIndex = this.captureDisplayIndex ?? -1;
         const psScript = `
         Add-Type -AssemblyName System.Windows.Forms,System.Drawing
         $screens = [System.Windows.Forms.Screen]::AllScreens
-        $top = ($screens | ForEach-Object {$_.Bounds.Top} | Measure-Object -Minimum).Minimum
-        $left = ($screens | ForEach-Object {$_.Bounds.Left} | Measure-Object -Minimum).Minimum
-        $width = ($screens | ForEach-Object {$_.Bounds.Right} | Measure-Object -Maximum).Maximum
-        $height = ($screens | ForEach-Object {$_.Bounds.Bottom} | Measure-Object -Maximum).Maximum
-        $bounds = [System.Drawing.Rectangle]::FromLTRB($left, $top, $width, $height)
+        if (${targetScreenIndex} -ge 0 -and ${targetScreenIndex} -lt $screens.Length) {
+          $bounds = $screens[${targetScreenIndex}].Bounds
+        } else {
+          $top = ($screens | ForEach-Object {$_.Bounds.Top} | Measure-Object -Minimum).Minimum
+          $left = ($screens | ForEach-Object {$_.Bounds.Left} | Measure-Object -Minimum).Minimum
+          $width = ($screens | ForEach-Object {$_.Bounds.Right} | Measure-Object -Maximum).Maximum
+          $height = ($screens | ForEach-Object {$_.Bounds.Bottom} | Measure-Object -Maximum).Maximum
+          $bounds = [System.Drawing.Rectangle]::FromLTRB($left, $top, $width, $height)
+        }
         $bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
         $graphics = [System.Drawing.Graphics]::FromImage($bmp)
         $graphics.CopyFromScreen($bounds.Left, $bounds.Top, 0, 0, $bounds.Size)
@@ -294,8 +375,8 @@ export class ScreenshotHelper {
     console.log("Taking screenshot in view:", this.view);
     hideMainWindow();
 
-    // Increased delay for window hiding on Windows
-    const hideDelay = process.platform === "win32" ? 500 : 300;
+    // Give compositor enough time to hide the app before capture.
+    const hideDelay = process.platform === "win32" ? 600 : 450;
     await new Promise((resolve) => setTimeout(resolve, hideDelay));
 
     let screenshotPath = "";

@@ -7,6 +7,7 @@ import { ScreenshotHelper } from "./ScreenshotHelper"
 import { ShortcutsHelper } from "./shortcuts"
 import { initAutoUpdater } from "./autoUpdater"
 import { configHelper } from "./ConfigHelper"
+import { isFocusProbeEnabled, logFocusProbe } from "./focusProbe"
 import * as dotenv from "dotenv"
 
 // Constants
@@ -19,8 +20,12 @@ const state = {
   isWindowVisible: false,
   windowPosition: null as { x: number; y: number } | null,
   windowSize: null as { width: number; height: number } | null,
+  screenX: 0,
+  screenY: 0,
   screenWidth: 0,
   screenHeight: 0,
+  activeDisplayIndex: 0,
+  isClickThroughMode: false,
   step: 0,
   currentX: 0,
   currentY: 0,
@@ -85,6 +90,7 @@ export interface IShortcutsHelperDeps {
   moveWindowRight: () => void
   moveWindowUp: () => void
   moveWindowDown: () => void
+  toggleClickThroughMode: () => void
 }
 
 export interface IIpcHandlerDeps {
@@ -107,11 +113,63 @@ export interface IIpcHandlerDeps {
   moveWindowRight: () => void
   moveWindowUp: () => void
   moveWindowDown: () => void
+  getClickThroughMode: () => boolean
+  getAvailableDisplays: () => Array<{
+    index: number
+    id: number
+    name: string
+    resolution: string
+    bounds: { x: number; y: number; width: number; height: number }
+    isPrimary: boolean
+  }>
+}
+
+function getOrderedDisplays(): Electron.Display[] {
+  const primaryId = screen.getPrimaryDisplay().id
+  return [...screen.getAllDisplays()].sort((a, b) => {
+    if (a.id === primaryId) return -1
+    if (b.id === primaryId) return 1
+    if (a.bounds.x !== b.bounds.x) return a.bounds.x - b.bounds.x
+    return a.bounds.y - b.bounds.y
+  })
+}
+
+function resolveDisplayByIndex(displayIndex: number | null | undefined): {
+  display: Electron.Display
+  resolvedIndex: number
+} {
+  const orderedDisplays = getOrderedDisplays()
+
+  if (orderedDisplays.length === 0) {
+    const primary = screen.getPrimaryDisplay()
+    return { display: primary, resolvedIndex: 0 }
+  }
+
+  if (
+    displayIndex !== null &&
+    displayIndex !== undefined &&
+    Number.isInteger(displayIndex) &&
+    displayIndex >= 0 &&
+    displayIndex < orderedDisplays.length
+  ) {
+    return { display: orderedDisplays[displayIndex], resolvedIndex: displayIndex }
+  }
+
+  return { display: orderedDisplays[0], resolvedIndex: 0 }
+}
+
+function updateActiveDisplayState(display: Electron.Display, displayIndex: number): void {
+  state.screenX = display.workArea.x
+  state.screenY = display.workArea.y
+  state.screenWidth = display.workArea.width
+  state.screenHeight = display.workArea.height
+  state.activeDisplayIndex = displayIndex
 }
 
 // Initialize helpers
 function initializeHelpers() {
-  state.screenshotHelper = new ScreenshotHelper(state.view)
+  const config = configHelper.loadConfig()
+  state.screenshotHelper = new ScreenshotHelper(state.view, config.displayIndex)
   state.processingHelper = new ProcessingHelper({
     getScreenshotHelper,
     getMainWindow,
@@ -140,17 +198,21 @@ function initializeHelpers() {
     toggleMainWindow,
     moveWindowLeft: () =>
       moveWindowHorizontal((x) =>
-        Math.max(-(state.windowSize?.width || 0) / 2, x - state.step)
+        Math.max(
+          state.screenX - (state.windowSize?.width || 0) / 2,
+          x - state.step
+        )
       ),
     moveWindowRight: () =>
       moveWindowHorizontal((x) =>
         Math.min(
-          state.screenWidth - (state.windowSize?.width || 0) / 2,
+          state.screenX + state.screenWidth - (state.windowSize?.width || 0) / 2,
           x + state.step
         )
       ),
     moveWindowUp: () => moveWindowVertical((y) => y - state.step),
-    moveWindowDown: () => moveWindowVertical((y) => y + state.step)
+    moveWindowDown: () => moveWindowVertical((y) => y + state.step),
+    toggleClickThroughMode
   } as IShortcutsHelperDeps)
 }
 
@@ -179,10 +241,10 @@ if (!gotTheLock) {
   app.quit()
 } else {
   app.on("second-instance", (event, commandLine) => {
-    // Someone tried to run a second instance, we should focus our window.
+    // Keep window visibility state in sync without stealing focus.
+    logFocusProbe("main", "second-instance-lock-handler")
     if (state.mainWindow) {
-      if (state.mainWindow.isMinimized()) state.mainWindow.restore()
-      state.mainWindow.focus()
+      showMainWindow()
 
       // Protocol handler removed - no longer using auth callbacks
     }
@@ -193,18 +255,22 @@ if (!gotTheLock) {
 
 // Window management functions
 async function createWindow(): Promise<void> {
+  logFocusProbe("main", "create-window-called", {
+    hasExistingWindow: Boolean(state.mainWindow)
+  })
+
   if (state.mainWindow) {
-    if (state.mainWindow.isMinimized()) state.mainWindow.restore()
-    state.mainWindow.focus()
+    showMainWindow()
     return
   }
 
-  const primaryDisplay = screen.getPrimaryDisplay()
-  const workArea = primaryDisplay.workAreaSize
-  state.screenWidth = workArea.width
-  state.screenHeight = workArea.height
+  const config = configHelper.loadConfig()
+  const { display, resolvedIndex } = resolveDisplayByIndex(config.displayIndex)
+  const workArea = display.workArea
+  updateActiveDisplayState(display, resolvedIndex)
   state.step = 60
-  state.currentY = 50
+  state.currentX = workArea.x + Math.max(0, Math.floor((workArea.width - 800) / 2))
+  state.currentY = workArea.y + 50
 
   const windowSettings: Electron.BrowserWindowConstructorOptions = {
     width: 800,
@@ -212,7 +278,7 @@ async function createWindow(): Promise<void> {
     minWidth: 750,
     minHeight: 550,
     x: state.currentX,
-    y: 50,
+    y: state.currentY,
     alwaysOnTop: true,
     webPreferences: {
       nodeIntegration: false,
@@ -222,7 +288,7 @@ async function createWindow(): Promise<void> {
         : path.join(__dirname, "preload.js"),
       scrollBounce: true
     },
-    show: true,
+    show: false,
     frame: false,
     transparent: true,
     fullscreenable: false,
@@ -239,15 +305,27 @@ async function createWindow(): Promise<void> {
   }
 
   state.mainWindow = new BrowserWindow(windowSettings)
+  logFocusProbe("main", "window-created", {
+    x: state.currentX,
+    y: state.currentY,
+    width: windowSettings.width ?? null,
+    height: windowSettings.height ?? null
+  })
 
   // Add more detailed logging for window events
   state.mainWindow.webContents.on("did-finish-load", () => {
     console.log("Window finished loading")
+    logFocusProbe("main", "window-did-finish-load")
+    emitClickThroughModeChanged()
   })
   state.mainWindow.webContents.on(
     "did-fail-load",
     async (event, errorCode, errorDescription) => {
       console.error("Window failed to load:", errorCode, errorDescription)
+      logFocusProbe("main", "window-did-fail-load", {
+        errorCode,
+        errorDescription
+      })
       if (isDev) {
         // In development, retry loading after a short delay
         console.log("Retrying to load development server...")
@@ -338,6 +416,24 @@ async function createWindow(): Promise<void> {
   state.mainWindow.on("move", handleWindowMove)
   state.mainWindow.on("resize", handleWindowResize)
   state.mainWindow.on("closed", handleWindowClosed)
+  state.mainWindow.on("focus", () => {
+    logFocusProbe("main", "window-focus")
+  })
+  state.mainWindow.on("blur", () => {
+    logFocusProbe("main", "window-blur")
+  })
+  state.mainWindow.on("show", () => {
+    logFocusProbe("main", "window-show")
+  })
+  state.mainWindow.on("hide", () => {
+    logFocusProbe("main", "window-hide")
+  })
+  state.mainWindow.on("minimize", () => {
+    logFocusProbe("main", "window-minimize")
+  })
+  state.mainWindow.on("restore", () => {
+    logFocusProbe("main", "window-restore")
+  })
 
   // Initialize window state
   const bounds = state.mainWindow.getBounds()
@@ -364,6 +460,8 @@ async function createWindow(): Promise<void> {
     state.mainWindow.setOpacity(savedOpacity);
     state.isWindowVisible = true;
   }
+
+  applyMouseInteractivityMode()
 }
 
 function handleWindowMove(): void {
@@ -385,6 +483,43 @@ function handleWindowClosed(): void {
   state.isWindowVisible = false
   state.windowPosition = null
   state.windowSize = null
+  logFocusProbe("main", "window-closed")
+}
+
+function applyMouseInteractivityMode(): void {
+  if (!state.mainWindow || state.mainWindow.isDestroyed()) return
+
+  if (!state.isWindowVisible || state.isClickThroughMode) {
+    state.mainWindow.setIgnoreMouseEvents(true, { forward: true })
+    return
+  }
+
+  state.mainWindow.setIgnoreMouseEvents(false)
+}
+
+function emitClickThroughModeChanged(): void {
+  if (!state.mainWindow || state.mainWindow.isDestroyed()) return
+  state.mainWindow.webContents.send(
+    "click-through-mode-changed",
+    state.isClickThroughMode
+  )
+}
+
+function setClickThroughMode(enabled: boolean): void {
+  if (state.isClickThroughMode === enabled) return
+  state.isClickThroughMode = enabled
+  applyMouseInteractivityMode()
+  emitClickThroughModeChanged()
+  logFocusProbe("main", "click-through-mode-changed", { enabled })
+  console.log(`Click-through mode ${enabled ? "enabled" : "disabled"}`)
+}
+
+function toggleClickThroughMode(): void {
+  setClickThroughMode(!state.isClickThroughMode)
+}
+
+function getClickThroughMode(): boolean {
+  return state.isClickThroughMode
 }
 
 // Window visibility functions
@@ -393,9 +528,10 @@ function hideMainWindow(): void {
     const bounds = state.mainWindow.getBounds();
     state.windowPosition = { x: bounds.x, y: bounds.y };
     state.windowSize = { width: bounds.width, height: bounds.height };
-    state.mainWindow.setIgnoreMouseEvents(true, { forward: true });
-    state.mainWindow.setOpacity(0);
     state.isWindowVisible = false;
+    applyMouseInteractivityMode();
+    state.mainWindow.setOpacity(0);
+    logFocusProbe("main", "window-hidden")
     console.log('Window hidden, opacity set to 0');
   }
 }
@@ -408,7 +544,6 @@ function showMainWindow(): void {
         ...state.windowSize
       });
     }
-    state.mainWindow.setIgnoreMouseEvents(false);
     state.mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
     state.mainWindow.setVisibleOnAllWorkspaces(true, {
       visibleOnFullScreen: true
@@ -416,13 +551,24 @@ function showMainWindow(): void {
     state.mainWindow.setContentProtection(true);
     state.mainWindow.setOpacity(0); // Set opacity to 0 before showing
     state.mainWindow.showInactive(); // Use showInactive instead of show+focus
-    state.mainWindow.setOpacity(1); // Then set opacity to 1 after showing
     state.isWindowVisible = true;
-    console.log('Window shown with showInactive(), opacity set to 1');
+    applyMouseInteractivityMode();
+    state.mainWindow.setOpacity(1); // Then set opacity to 1 after showing
+    logFocusProbe("main", "window-shown-inactive", {
+      clickThroughMode: state.isClickThroughMode
+    })
+    console.log(
+      `Window shown with showInactive(), opacity set to 1 (click-through: ${
+        state.isClickThroughMode ? "on" : "off"
+      })`
+    );
   }
 }
 
 function toggleMainWindow(): void {
+  logFocusProbe("main", "toggle-window-called", {
+    wasVisible: state.isWindowVisible
+  })
   console.log(`Toggling window. Current state: ${state.isWindowVisible ? 'visible' : 'hidden'}`);
   if (state.isWindowVisible) {
     hideMainWindow();
@@ -446,15 +592,16 @@ function moveWindowVertical(updateFn: (y: number) => number): void {
 
   const newY = updateFn(state.currentY)
   // Allow window to go 2/3 off screen in either direction
-  const maxUpLimit = (-(state.windowSize?.height || 0) * 2) / 3
+  const maxUpLimit = state.screenY - ((state.windowSize?.height || 0) * 2) / 3
   const maxDownLimit =
-    state.screenHeight + ((state.windowSize?.height || 0) * 2) / 3
+    state.screenY + state.screenHeight + ((state.windowSize?.height || 0) * 2) / 3
 
   // Log the current state and limits
   console.log({
     newY,
     maxUpLimit,
     maxDownLimit,
+    screenY: state.screenY,
     screenHeight: state.screenHeight,
     windowHeight: state.windowSize?.height,
     currentY: state.currentY
@@ -474,12 +621,19 @@ function moveWindowVertical(updateFn: (y: number) => number): void {
 function setWindowDimensions(width: number, height: number): void {
   if (!state.mainWindow?.isDestroyed()) {
     const [currentX, currentY] = state.mainWindow.getPosition()
-    const primaryDisplay = screen.getPrimaryDisplay()
-    const workArea = primaryDisplay.workAreaSize
+    const workArea = {
+      x: state.screenX,
+      y: state.screenY,
+      width: state.screenWidth,
+      height: state.screenHeight
+    }
     const maxWidth = Math.floor(workArea.width * 0.5)
 
     state.mainWindow.setBounds({
-      x: Math.min(currentX, workArea.width - maxWidth),
+      x: Math.max(
+        workArea.x,
+        Math.min(currentX, workArea.x + workArea.width - maxWidth)
+      ),
       y: currentY,
       width: Math.min(width + 32, maxWidth),
       height: Math.ceil(height)
@@ -505,6 +659,13 @@ function loadEnvVariables() {
 // Initialize application
 async function initializeApp() {
   try {
+    if (isFocusProbeEnabled()) {
+      logFocusProbe("main", "focus-probe-enabled", {
+        platform: process.platform,
+        isDev
+      })
+    }
+
     // Set custom cache directory to prevent permission issues
     const appDataPath = path.join(app.getPath('appData'), 'interview-coder-v1')
     const sessionPath = path.join(appDataPath, 'session')
@@ -547,19 +708,52 @@ async function initializeApp() {
       setView,
       moveWindowLeft: () =>
         moveWindowHorizontal((x) =>
-          Math.max(-(state.windowSize?.width || 0) / 2, x - state.step)
+          Math.max(
+            state.screenX - (state.windowSize?.width || 0) / 2,
+            x - state.step
+          )
         ),
       moveWindowRight: () =>
         moveWindowHorizontal((x) =>
           Math.min(
-            state.screenWidth - (state.windowSize?.width || 0) / 2,
+            state.screenX + state.screenWidth - (state.windowSize?.width || 0) / 2,
             x + state.step
           )
         ),
       moveWindowUp: () => moveWindowVertical((y) => y - state.step),
-      moveWindowDown: () => moveWindowVertical((y) => y + state.step)
+      moveWindowDown: () => moveWindowVertical((y) => y + state.step),
+      getClickThroughMode,
+      getAvailableDisplays
     })
     await createWindow()
+
+    // Keep display placement and screenshot display selection in sync with config changes.
+    configHelper.on("config-updated", (config) => {
+      state.screenshotHelper?.setCaptureDisplayIndex(config.displayIndex ?? null)
+
+      const previousDisplayIndex = state.activeDisplayIndex
+      const { display, resolvedIndex } = resolveDisplayByIndex(config.displayIndex)
+      updateActiveDisplayState(display, resolvedIndex)
+
+      if (!state.mainWindow || state.mainWindow.isDestroyed()) return
+      if (resolvedIndex === previousDisplayIndex) return
+
+      const bounds = state.mainWindow.getBounds()
+      const nextX =
+        display.workArea.x +
+        Math.max(0, Math.floor((display.workArea.width - bounds.width) / 2))
+      const nextY = display.workArea.y + 50
+
+      state.mainWindow.setBounds({
+        ...bounds,
+        x: nextX,
+        y: nextY
+      })
+      state.currentX = nextX
+      state.currentY = nextY
+      state.windowPosition = { x: nextX, y: nextY }
+    })
+
     state.shortcutsHelper?.registerGlobalShortcuts()
 
     // Initialize auto-updater regardless of environment
@@ -584,13 +778,13 @@ app.on("open-url", (event, url) => {
 // Handle second instance (removed auth callback handling)
 app.on("second-instance", (event, commandLine) => {
   console.log("second-instance event received:", commandLine)
+  logFocusProbe("main", "second-instance-app-handler")
   
-  // Focus or create the main window
+  // Reveal window without shifting user focus away from current app.
   if (!state.mainWindow) {
     createWindow()
   } else {
-    if (state.mainWindow.isMinimized()) state.mainWindow.restore()
-    state.mainWindow.focus()
+    showMainWindow()
   }
 })
 
@@ -607,6 +801,7 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.on("activate", () => {
+  logFocusProbe("main", "app-activate")
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   }
@@ -624,6 +819,30 @@ function getView(): "queue" | "solutions" | "debug" {
 function setView(view: "queue" | "solutions" | "debug"): void {
   state.view = view
   state.screenshotHelper?.setView(view)
+}
+
+function getAvailableDisplays(): Array<{
+  index: number
+  id: number
+  name: string
+  resolution: string
+  bounds: { x: number; y: number; width: number; height: number }
+  isPrimary: boolean
+}> {
+  const primaryId = screen.getPrimaryDisplay().id
+  return getOrderedDisplays().map((display, index) => ({
+    index,
+    id: display.id,
+    name: display.label || `Display ${index + 1}`,
+    resolution: `${display.bounds.width}x${display.bounds.height}`,
+    bounds: {
+      x: display.bounds.x,
+      y: display.bounds.y,
+      width: display.bounds.width,
+      height: display.bounds.height
+    },
+    isPrimary: display.id === primaryId
+  }))
 }
 
 function getScreenshotHelper(): ScreenshotHelper | null {

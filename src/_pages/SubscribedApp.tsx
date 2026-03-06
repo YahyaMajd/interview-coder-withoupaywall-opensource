@@ -134,6 +134,54 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
     return () => cleanupFunctions.forEach((fn) => fn())
   }, [view])
 
+  useEffect(() => {
+    const isScrollable = (element: HTMLElement): boolean => {
+      const style = window.getComputedStyle(element)
+      const overflowY = style.overflowY
+      const canScroll =
+        (overflowY === "auto" || overflowY === "scroll") &&
+        element.scrollHeight > element.clientHeight + 2
+      return canScroll && element.clientHeight > 0
+    }
+
+    const resolveScrollTarget = (): HTMLElement | null => {
+      const active = document.activeElement as HTMLElement | null
+      let node = active
+      while (node) {
+        if (isScrollable(node)) return node
+        node = node.parentElement
+      }
+
+      const candidates = Array.from(
+        document.querySelectorAll<HTMLElement>(".overflow-auto, .overflow-y-auto")
+      ).filter(isScrollable)
+
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => b.clientHeight - a.clientHeight)
+        return candidates[0]
+      }
+
+      return null
+    }
+
+    const unsubscribe = window.electronAPI.onAnswerScroll(({ direction, amount = 140 }) => {
+      if (view !== "solutions" && view !== "debug") return
+
+      const delta = direction === "up" ? -Math.abs(amount) : Math.abs(amount)
+      const target = resolveScrollTarget()
+      if (target) {
+        target.scrollBy({ top: delta, behavior: "auto" })
+        return
+      }
+
+      window.scrollBy({ top: delta, behavior: "auto" })
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [view])
+
   return (
     <div ref={containerRef} className="min-h-0">
       {view === "queue" ? (

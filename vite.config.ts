@@ -11,6 +11,9 @@ export default defineConfig({
       {
         // main.ts
         entry: "electron/main.ts",
+        // We launch Electron manually in package.json scripts.
+        // Disable vite-plugin-electron auto startup to avoid duplicate app instances.
+        onstart() {},
         vite: {
           build: {
             outDir: "dist-electron",
@@ -25,6 +28,8 @@ export default defineConfig({
       {
         // preload.ts
         entry: "electron/preload.ts",
+        // Keep auto startup disabled for all electron entries.
+        onstart() {},
         vite: {
           build: {
             outDir: "dist-electron",

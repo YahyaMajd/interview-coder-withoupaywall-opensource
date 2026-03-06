@@ -15,6 +15,7 @@ import {
 import { ToastContext } from "./contexts/toast"
 import { WelcomeScreen } from "./components/WelcomeScreen"
 import { SettingsDialog } from "./components/Settings/SettingsDialog"
+import { COMMAND_KEY } from "./utils/platform"
 
 // Create a React Query client
 const queryClient = new QueryClient({
@@ -47,6 +48,7 @@ function App() {
   // Note: Model selection is now handled via separate extraction/solution/debugging model settings
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isClickThroughMode, setIsClickThroughMode] = useState(false)
 
   // Set unlimited credits
   const updateCredits = useCallback(() => {
@@ -146,6 +148,31 @@ function App() {
       unsubscribeSettings();
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadClickThroughMode = async () => {
+      try {
+        const enabled = await window.electronAPI.getClickThroughMode()
+        if (isMounted) {
+          setIsClickThroughMode(enabled)
+        }
+      } catch (error) {
+        console.error("Failed to load click-through mode:", error)
+      }
+    }
+
+    loadClickThroughMode()
+    const unsubscribe = window.electronAPI.onClickThroughModeChanged((enabled) => {
+      setIsClickThroughMode(enabled)
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
+  }, [])
 
   // Initialize basic app state
   useEffect(() => {
@@ -258,6 +285,13 @@ function App() {
                   <p className="text-white/60 text-sm">
                     Initializing...
                   </p>
+                </div>
+              </div>
+            )}
+            {isClickThroughMode && (
+              <div className="pointer-events-none absolute top-2 right-2 z-[100]">
+                <div className="rounded-md border border-white/10 bg-black/45 px-2 py-1 text-[10px] text-white/60 backdrop-blur-sm">
+                  Click-through {COMMAND_KEY}+M
                 </div>
               </div>
             )}

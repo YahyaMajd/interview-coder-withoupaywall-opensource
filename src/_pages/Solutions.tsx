@@ -83,7 +83,13 @@ const SolutionSection = ({
           </button>
           <SyntaxHighlighter
             showLineNumbers
-            language={currentLanguage == "golang" ? "go" : currentLanguage}
+            language={
+              currentLanguage === "golang"
+                ? "go"
+                : currentLanguage === "python3"
+                ? "python"
+                : currentLanguage
+            }
             style={dracula}
             customStyle={{
               maxWidth: "100%",
@@ -501,7 +507,11 @@ const Solutions: React.FC<SolutionsProps> = ({
           />
 
           {/* Main Content - Modified width constraints */}
-          <div className="w-full text-sm text-black bg-black/60 rounded-md">
+          <div
+            className="w-full text-sm text-black bg-black/60 rounded-md overflow-y-auto"
+            style={{ minHeight: "min(720px, 70vh)", maxHeight: "82vh" }}
+            data-answer-scroll="true"
+          >
             <div className="rounded-lg overflow-hidden">
               <div className="px-4 py-3 space-y-4 max-w-full">
                 {!solutionData && (
@@ -524,7 +534,7 @@ const Solutions: React.FC<SolutionsProps> = ({
                 {solutionData && (
                   <>
                     <ContentSection
-                      title={`My Thoughts (${COMMAND_KEY} + Arrow keys to scroll)`}
+                      title={`My Thoughts (${COMMAND_KEY} + Shift + ↑/↓ to scroll)`}
                       content={
                         thoughtsData && (
                           <div className="space-y-3">

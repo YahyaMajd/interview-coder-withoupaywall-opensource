@@ -54,8 +54,41 @@ export interface ElectronAPI {
   getPlatform: () => string
   
   // New methods for OpenAI integration
-  getConfig: () => Promise<{ apiKey: string; model: string }>
-  updateConfig: (config: { apiKey?: string; model?: string }) => Promise<boolean>
+  getConfig: () => Promise<{
+    apiKey: string
+    apiProvider?: "openai" | "gemini" | "anthropic"
+    extractionModel?: string
+    solutionModel?: string
+    debuggingModel?: string
+    language?: string
+    opacity?: number
+    displayIndex?: number | null
+  }>
+  updateConfig: (config: {
+    apiKey?: string
+    apiProvider?: "openai" | "gemini" | "anthropic"
+    extractionModel?: string
+    solutionModel?: string
+    debuggingModel?: string
+    language?: string
+    opacity?: number
+    displayIndex?: number | null
+  }) => Promise<boolean>
+  getAvailableDisplays: () => Promise<
+    Array<{
+      index: number
+      id: number
+      name: string
+      resolution: string
+      bounds: { x: number; y: number; width: number; height: number }
+      isPrimary: boolean
+    }>
+  >
+  getClickThroughMode: () => Promise<boolean>
+  onClickThroughModeChanged: (callback: (enabled: boolean) => void) => () => void
+  onAnswerScroll: (
+    callback: (payload: { direction: "up" | "down"; amount?: number }) => void
+  ) => () => void
   checkApiKey: () => Promise<boolean>
   validateApiKey: (apiKey: string) => Promise<{ valid: boolean; error?: string }>
   openLink: (url: string) => void

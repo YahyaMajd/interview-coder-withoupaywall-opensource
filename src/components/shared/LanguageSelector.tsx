@@ -41,6 +41,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           style={{ WebkitAppearance: 'menulist' }}
         >
           <option value="python" className="bg-black text-white">Python</option>
+          <option value="python3" className="bg-black text-white">Python 3</option>
           <option value="javascript" className="bg-black text-white">JavaScript</option>
           <option value="java" className="bg-black text-white">Java</option>
           <option value="golang" className="bg-black text-white">Go</option>

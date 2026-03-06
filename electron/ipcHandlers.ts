@@ -4,6 +4,7 @@ import { ipcMain, shell, dialog } from "electron"
 import { randomBytes } from "crypto"
 import { IIpcHandlerDeps } from "./main"
 import { configHelper } from "./ConfigHelper"
+import { logFocusProbe } from "./focusProbe"
 
 export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   console.log("Initializing IPC handlers")
@@ -15,6 +16,14 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
 
   ipcMain.handle("update-config", (_event, updates) => {
     return configHelper.updateConfig(updates);
+  })
+
+  ipcMain.handle("get-available-displays", () => {
+    return deps.getAvailableDisplays()
+  })
+
+  ipcMain.handle("get-click-through-mode", () => {
+    return deps.getClickThroughMode()
   })
 
   ipcMain.handle("check-api-key", () => {
@@ -153,6 +162,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
 
   // Screenshot trigger handlers
   ipcMain.handle("trigger-screenshot", async () => {
+    logFocusProbe("ipc", "trigger-screenshot")
     const mainWindow = deps.getMainWindow()
     if (mainWindow) {
       try {
@@ -165,7 +175,8 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
         return { success: true }
       } catch (error) {
         console.error("Error triggering screenshot:", error)
-        return { error: "Failed to trigger screenshot" }
+        const message = error instanceof Error ? error.message : "Failed to trigger screenshot"
+        return { error: message }
       }
     }
     return { error: "No main window available" }
@@ -178,7 +189,8 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
       return { path: screenshotPath, preview }
     } catch (error) {
       console.error("Error taking screenshot:", error)
-      return { error: "Failed to take screenshot" }
+      const message = error instanceof Error ? error.message : "Failed to take screenshot"
+      return { error: message }
     }
   })
 
@@ -212,6 +224,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
 
   // Window management handlers
   ipcMain.handle("toggle-window", () => {
+    logFocusProbe("ipc", "toggle-window")
     try {
       deps.toggleMainWindow()
       return { success: true }
@@ -253,6 +266,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
 
   // Reset handlers
   ipcMain.handle("trigger-reset", () => {
+    logFocusProbe("ipc", "trigger-reset")
     try {
       // First cancel any ongoing requests
       deps.processingHelper?.cancelOngoingRequests()
@@ -280,6 +294,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
 
   // Window movement handlers
   ipcMain.handle("trigger-move-left", () => {
+    logFocusProbe("ipc", "trigger-move-left")
     try {
       deps.moveWindowLeft()
       return { success: true }
@@ -290,6 +305,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   })
 
   ipcMain.handle("trigger-move-right", () => {
+    logFocusProbe("ipc", "trigger-move-right")
     try {
       deps.moveWindowRight()
       return { success: true }
@@ -300,6 +316,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   })
 
   ipcMain.handle("trigger-move-up", () => {
+    logFocusProbe("ipc", "trigger-move-up")
     try {
       deps.moveWindowUp()
       return { success: true }
@@ -310,6 +327,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   })
 
   ipcMain.handle("trigger-move-down", () => {
+    logFocusProbe("ipc", "trigger-move-down")
     try {
       deps.moveWindowDown()
       return { success: true }
@@ -321,6 +339,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   
   // Delete last screenshot handler
   ipcMain.handle("delete-last-screenshot", async () => {
+    logFocusProbe("ipc", "delete-last-screenshot")
     try {
       const queue = deps.getView() === "queue" 
         ? deps.getScreenshotQueue() 

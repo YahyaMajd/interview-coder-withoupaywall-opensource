@@ -205,8 +205,38 @@ const electronAPI = {
   
   // New methods for OpenAI API integration
   getConfig: () => ipcRenderer.invoke("get-config"),
-  updateConfig: (config: { apiKey?: string; model?: string; language?: string; opacity?: number }) => 
+  updateConfig: (config: {
+    apiKey?: string
+    apiProvider?: "openai" | "gemini" | "anthropic"
+    extractionModel?: string
+    solutionModel?: string
+    debuggingModel?: string
+    language?: string
+    opacity?: number
+    displayIndex?: number | null
+  }) => 
     ipcRenderer.invoke("update-config", config),
+  getAvailableDisplays: () => ipcRenderer.invoke("get-available-displays"),
+  getClickThroughMode: () => ipcRenderer.invoke("get-click-through-mode"),
+  onClickThroughModeChanged: (callback: (enabled: boolean) => void) => {
+    const subscription = (_: any, enabled: boolean) => callback(enabled)
+    ipcRenderer.on("click-through-mode-changed", subscription)
+    return () => {
+      ipcRenderer.removeListener("click-through-mode-changed", subscription)
+    }
+  },
+  onAnswerScroll: (
+    callback: (payload: { direction: "up" | "down"; amount?: number }) => void
+  ) => {
+    const subscription = (
+      _: any,
+      payload: { direction: "up" | "down"; amount?: number }
+    ) => callback(payload)
+    ipcRenderer.on("answer-scroll", subscription)
+    return () => {
+      ipcRenderer.removeListener("answer-scroll", subscription)
+    }
+  },
   onShowSettings: (callback: () => void) => {
     const subscription = () => callback()
     ipcRenderer.on("show-settings-dialog", subscription)

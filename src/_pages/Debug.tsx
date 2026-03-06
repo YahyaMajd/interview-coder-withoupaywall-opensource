@@ -34,7 +34,13 @@ const CodeSection = ({
       <div className="w-full">
         <SyntaxHighlighter
           showLineNumbers
-          language={currentLanguage == "golang" ? "go" : currentLanguage}
+          language={
+            currentLanguage === "golang"
+              ? "go"
+              : currentLanguage === "python3"
+              ? "python"
+              : currentLanguage
+          }
           style={dracula}
           customStyle={{
             maxWidth: "100%",
@@ -286,7 +292,11 @@ const Debug: React.FC<DebugProps> = ({
       />
 
       {/* Main Content */}
-      <div className="w-full text-sm text-black bg-black/60 rounded-md">
+      <div
+        className="w-full text-sm text-black bg-black/60 rounded-md overflow-y-auto"
+        style={{ minHeight: "min(720px, 70vh)", maxHeight: "82vh" }}
+        data-answer-scroll="true"
+      >
         <div className="rounded-lg overflow-hidden">
           <div className="px-4 py-3 space-y-4">
             {/* Thoughts Section */}

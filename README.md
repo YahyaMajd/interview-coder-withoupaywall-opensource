@@ -53,11 +53,11 @@ All it takes is modest JavaScript/TypeScript knowledge and understanding of the 
 
 - 🎯 99% Invisibility: Undetectable window that bypasses most screen capture methods
 - 📸 Smart Screenshot Capture: Capture both question text and code separately for better analysis
-- 🤖 AI-Powered Analysis: Automatically extracts and analyzes coding problems using GPT-4o
+- 🤖 AI-Powered Analysis: Automatically extracts and analyzes coding problems using OpenAI models
 - 💡 Solution Generation: Get detailed explanations and solutions with time/space complexity analysis
 - 🔧 Real-time Debugging: Debug your code with AI assistance and structured feedback
 - 🎨 Advanced Window Management: Freely move, resize, change opacity, and zoom the window
-- 🔄 Model Selection: Choose between GPT-4o and GPT-4o-mini for different processing stages
+- 🔄 Model Selection: Choose between GPT-5.3, GPT-4o, and other provider models for different processing stages
 - 🔒 Privacy-Focused: Your API key and data never leave your computer except for OpenAI API calls
 
 ## Global Commands
@@ -66,6 +66,7 @@ The application uses unidentifiable global keyboard shortcuts that won't be dete
 
 - Toggle Window Visibility: [Control or Cmd + B]
 - Move Window: [Control or Cmd + Arrow keys]
+- Scroll Answer: [Control or Cmd + Shift + Up/Down]
 - Take Screenshot: [Control or Cmd + H]
 - Delete Last Screenshot: [Control or Cmd + L]
 - Process Screenshots: [Control or Cmd + Enter]
@@ -243,6 +244,7 @@ The packaged applications will be available in the `release` directory.
 
 5. **Window Management**
    - Move window using [Control or Cmd + Arrow keys]
+   - Scroll the answer using [Control or Cmd + Shift + Up/Down]
    - Toggle visibility with [Control or Cmd + B]
    - Adjust opacity with [Control or Cmd + [] and [Control or Cmd + ]]
    - Window remains invisible to specified screen sharing applications
@@ -268,7 +270,7 @@ To add new models, simply extend the API integration in `electron/ProcessingHelp
 ## Configuration
 
 - **OpenAI API Key**: Your personal API key is stored locally and only used for API calls to OpenAI
-- **Model Selection**: You can choose between GPT-4o and GPT-4o-mini for each stage of processing:
+- **Model Selection**: You can choose between OpenAI GPT-5.3 (`gpt-5.1`, `gpt-5.3-chat-latest`) and GPT-4o models for each stage of processing:
   - Problem Extraction: Analyzes screenshots to understand the coding problem
   - Solution Generation: Creates optimized solutions with explanations
   - Debugging: Provides detailed analysis of errors and improvement suggestions
